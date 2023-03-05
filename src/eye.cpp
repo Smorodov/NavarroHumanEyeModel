@@ -182,16 +182,19 @@ HumanEye::~HumanEye()
 
 float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil, cv::Mat& screen, cv::Mat& screenHitCount, cv::Vec3f c) const
 {
-	//int iter = 100, pass = 0;
 	Point objectSample = Point(x, y, z);
 	std::vector<Point> points;
 	float aperture = lenses[lenses.size() - 1].aperture / 2;
-	float nsteps = aperture * screen.cols / 2 / 30.0 / 10;
-	for (float i = -aperture / 2.0; i <= aperture / 2.0; i += aperture / nsteps)
+	float nsteps = aperture * screen.cols / 2 / 30.0/10;
+	float r2 = aperture * aperture / 4.0;
+	float s = -aperture / 2.0;
+	float e = aperture / 2.0;
+	float st = aperture / nsteps;
+	for (float i = s; i <= e; i += st)
 	{
-		for (float j = -aperture / 2.0; j <= aperture / 2.0; j += aperture / nsteps)
+		for (float j = s; j <= e; j += st)
 		{
-			if (i * i + j * j > (aperture / 2.0) * (aperture / 2.0))
+			if (i * i + j * j > r2)
 			{
 				continue;
 			}
@@ -202,22 +205,20 @@ float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil,
 				primaryRay.d = Normalize(primaryRay.o - Point(0, 0, lenses[0].zPos + 2 * lenses[0].radius));
 				float t = (lenses[0].zPos - primaryRay.o.z) / primaryRay.d.z;
 				Point hit = primaryRay(t);
-				hit.x *= screen.cols / 2 / 30.0;
-				hit.y *= screen.rows / 2 / 30.0;
-				hit.x += screen.cols / 2;
-				hit.y += screen.rows / 2;
+				hit.x *= (float)screen.cols / 60.0; // assume diameter=30 mm
+				hit.y *= (float)screen.rows / 60.0; // assume diameter=30 mm
+				hit.x += (float)screen.cols / 2.0;
+				hit.y += (float)screen.rows / 2.0;
 				if (hit.x >= 0 && hit.x < screen.cols &&
 				        hit.y >= 0 && hit.y < screen.rows
 				   )
 				{
-					screen.at<cv::Vec3f>(hit.y, hit.x) += c;// * k[int(fabs(i)/ aperture*nsteps)]*k[int(fabs(j) / aperture * nsteps)];
-					screenHitCount.at<float>(hit.y, hit.x) = screenHitCount.at<float>(hit.y, hit.x) + 1.0; //k[int(fabs(i) / aperture * nsteps)] * k[int(fabs(j) / aperture * nsteps)];
-				}
-				//pass++;
+					screen.at<cv::Vec3f>(round(hit.y), round(hit.x)) += c;
+					screenHitCount.at<float>(round(hit.y), round(hit.x) ) += 1.0;
+				}				
 			}
 		}
-	}
-	//printf("pass number: %d\n", pass);
+	}	
 	return 0;
 }
 
