@@ -35,4 +35,5 @@
 *.swp
 
 build/*
+doc/*
 vs2022/*

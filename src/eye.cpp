@@ -20,12 +20,14 @@ HumanEye::HumanEye()
 bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end) const
 {
 	Ray tempRay = inRay;
+	
 	if (inRay.o.z > 10)
 	{
 		// move start point close enough
 		float t = (Point(0, 0, 10) - inRay.o).z / inRay.d.z;
 		tempRay.o = inRay(t);
 	}
+	
 	int increment = (end >= start) ? 1 : -1;
 	int i = start;
 	for (; i != end; i += increment)
@@ -184,12 +186,15 @@ float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil,
 {
 	Point objectSample = Point(x, y, z);
 	std::vector<Point> points;
-	float aperture = lenses[lenses.size() - 1].aperture / 2;
-	float nsteps = aperture * screen.cols / 2 / 30.0/10;
+	
+	// диаметр зрачка
+	float aperture = lenses.back().aperture / 2.0;
+	float nsteps = 10;// aperture* screen.cols / 2 / 30.0 / 10;
 	float r2 = aperture * aperture / 4.0;
 	float s = -aperture / 2.0;
 	float e = aperture / 2.0;
-	float st = aperture / nsteps;
+	float st = 2.0*M_PI / nsteps;
+			
 	for (float i = s; i <= e; i += st)
 	{
 		for (float j = s; j <= e; j += st)
@@ -202,11 +207,13 @@ float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil,
 			Ray filmLensRay(objectSample, Normalize(lensSample - objectSample), 0), primaryRay;
 			if (TraceLenses(filmLensRay, primaryRay, (int)lenses.size() - 1, -1, points))
 			{
-				primaryRay.d = Normalize(primaryRay.o - Point(0, 0, lenses[0].zPos + 2 * lenses[0].radius));
-				float t = (lenses[0].zPos - primaryRay.o.z) / primaryRay.d.z;
-				Point hit = primaryRay(t);
-				hit.x *= (float)screen.cols / 60.0; // assume diameter=30 mm
-				hit.y *= (float)screen.rows / 60.0; // assume diameter=30 mm
+				//primaryRay.d = Normalize(primaryRay.o - Point(0, 0, lenses[0].zPos + 2 * lenses[0].radius));
+				//float t = (lenses[0].zPos - primaryRay.o.z) / primaryRay.d.z;
+				//Point hit = primaryRay(t);
+				Point hit = primaryRay.o;
+
+				hit.x *= (float)screen.cols / 24.0; // assume diameter=30 mm
+				hit.y *= (float)screen.rows / 24.0; // assume diameter=30 mm
 				hit.x += (float)screen.cols / 2.0;
 				hit.y += (float)screen.rows / 2.0;
 				if (hit.x >= 0 && hit.x < screen.cols &&
@@ -218,7 +225,8 @@ float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil,
 				}				
 			}
 		}
-	}	
+	}
+	
 	return 0;
 }
 
@@ -260,6 +268,8 @@ bool HumanEye::SetFocalLength(float f)
 			//inRay.d = Vector(0,0,-1);
 			if (TraceLenses(inRay, outRay, lenses.size() - 1, 0))
 			{
+				if (fabs(outRay.d.y) < 1e-6) continue;
+
 				float t = -outRay.o.y / outRay.d.y;
 				if (t > 0)
 				{
@@ -310,25 +320,37 @@ Vector Lens::GetNormal(const Ray* ray, const Point& p) const
 
 bool Lens::RefractRay(const Ray& inRay, Ray& outRay) const
 {
+	// точка попадант€ луча в линзу
 	Point phit;
+	// -----------
+	// Ёто апертура
+	// ------------
 	if (radius == 0)
 	{
-		// lens is aperture
+		// параметр точки на луче (рассто€ние от начала)
 		float thit = (zPos - inRay.o.z) / inRay.d.z;
+		// не попали в плоскость апертуры (луч в другую стоорону или недостаточеа€ длина луча)
 		if (thit < 0 || thit > inRay.maxt)
 		{
 			return false;
 		}
+		// точка попадани€ луча в плоскость линзы
 		phit = inRay(thit);
+		// проверим попали ли в апертуру
 		if (phit.x * phit.x + phit.y * phit.y > aperture * aperture * 0.25)
 		{
+			// не попали
 			return false;
 		}
+		// новый луч из точки попадани€,, параллельный сам себе.
 		outRay.o = phit;
 		outRay.d = inRay.d;
 		return true;
 	}
-	// Transfer inRay's origin relative to center point
+	// ---------
+	// Ёто линза
+	// // -------
+	// ѕересчитаем координаты начала луча относительно центра линзы
 	Vector tOrigin = inRay.o - Point(0, 0, zPos);
 	Vector tDir = inRay.d;//Normalize(inRay.d - Vector(0,0,zPos));
 	// Compute quadratic sphere coefficients
@@ -339,7 +361,7 @@ bool Lens::RefractRay(const Ray& inRay, Ray& outRay) const
 	float C = tOrigin.x * tOrigin.x + tOrigin.y * tOrigin.y + (1 + asphericity) * tOrigin.z * tOrigin.z - 2 * radius * tOrigin.z;
 	if (A == 0)
 	{
-		float t = -C / B + 1e-6;
+		float t = -C / (B + 1e-6);
 		phit = inRay(t);
 	}
 	else
@@ -383,24 +405,33 @@ bool Lens::RefractRay(const Ray& inRay, Ray& outRay) const
 		}
 		phit = inRay(tt);
 	}
+
+
+
 	if (refractionRatio == 0)
 	{
-		// hit retina
+		// ------------------
+		// ѕопали в сетчатку
+		// ------------------
 		outRay.o = phit;
 		outRay.d = inRay.d;
+		
 		return true;
 	}
 	if (phit.HasNaNs() || !OnLens(phit))
 	{
 		return false;
 	}
+	// -----------------
+	// нормальна€ линза
+	// // -----------------
 	//Vector n  = Normalize(phit - center);
 	Vector n = GetNormal(&inRay, phit);
 	Vector in = Normalize(tDir);
 	float mu = refractionRatio;
 	if (tDir.z < 0)
 	{
-		mu = 1 / mu;
+		mu = 1.0 / mu;
 	}
 	float cosI = -Dot(n, in);
 	float sinT2 = mu * mu * (1 - cosI * cosI);
@@ -408,7 +439,7 @@ bool Lens::RefractRay(const Ray& inRay, Ray& outRay) const
 	{
 		return false;
 	}
-	float cosT = sqrt(1 - sinT2);
+	float cosT = sqrtf(1 - sinT2);
 	outRay.d = mu * in + (mu * cosI - cosT) * n;
 	outRay.o = phit;
 	return true;

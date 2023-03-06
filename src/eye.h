@@ -10,6 +10,18 @@
 class Lens
 {
 	public:
+
+		inline void print(void)
+		{
+			std::cout << "-----------------" << std::endl;
+			std::cout << "radius=" << radius << std::endl <<
+				"asphericity=" << asphericity << std::endl <<
+				"zPos=" << zPos << std::endl <<
+				"refractionRatio=" << refractionRatio << std::endl <<
+				"aperture=" << aperture << std::endl;
+			std::cout << "-----------------" << std::endl;
+		}
+
 		Lens(float rad, float asph, float zpos, float refr, float aper);
 		bool RefractRay(const Ray &inRay, Ray &outRay) const;
 		Vector GetNormal(const Ray * ray, const Point & p) const;
@@ -40,7 +52,7 @@ class HumanEye
 			lenses[3].aperture = pupilSize;
 		}
 
-	private:
+	//private:
 		// film plane's z position
 		float filmPlane;
 		float filmDistance;

@@ -4,17 +4,17 @@ Based om tecton's Human-Eye-Model-Ray-Tracing
 
 Rather accurate model of huan eye.
 
-* focus = 420 mm 
+* focus = 520 mm 
 
-* distance = 420 mm
+* distance = 520 mm
 * pupil = 6 mm
 
-![](res0.png)
+![](res1.png)
 
 
 * focus = 120 mm
-* distance = 420 mm
+* distance = 520 mm
 * pupil = 6 mm
 
 
-![](res1.png)
+![](res2.png)
