@@ -18,3 +18,7 @@ Rather accurate model of huan eye.
 
 
 ![](res2.png)
+
+* color aberrations modeling
+
+![](res3.png)
