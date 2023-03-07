@@ -23,7 +23,7 @@ class Lens
 		}
 
 		Lens(float rad, float asph, float zpos, float refr, float aper);
-		bool RefractRay(const Ray &inRay, Ray &outRay) const;
+		bool RefractRay(const Ray &inRay, Ray &outRay,float kn) const;
 		Vector GetNormal(const Ray * ray, const Point & p) const;
 		bool OnLens(Point p) const;
 		float yToZ(float);
@@ -40,10 +40,10 @@ class HumanEye
 	public:
 		HumanEye();
 		~HumanEye();
-		float GenerateRay(float focus, float x, float y, float z, float pupil, cv::Mat& screen,cv::Mat& screenHitCount,cv::Vec3f c) const;
+		float GenerateRay(float focus, float x, float y, float z, float pupil, std::vector<Point>& hitPoints, float kn) const;
 		void ParseSpecfile(const std::string & specfile);
-		bool TraceLenses(const Ray &inRay, Ray &outRay, int start, int end) const;
-		bool TraceLenses(const Ray &inRay, Ray &outRay, int start, int end, std::vector<Point>& points) const;
+		bool TraceLenses(const Ray &inRay, Ray &outRay, int start, int end,float kn) const;
+		bool TraceLenses(const Ray &inRay, Ray &outRay, int start, int end, std::vector<Point>& points,float kn) const;
 		Point getRandomPointOnLens() const;
 		bool SetFocalLength(float focus);
 		void SetDP(float);

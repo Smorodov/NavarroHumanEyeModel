@@ -3,13 +3,13 @@
 // https://peteroupc.github.io/colorgen.html
 // waveLength = 650 - 250 / 270 * H
 
-
+#if 0
 int main()
 {
 	float density = 2;
 
-	float focus = 120;
-	float srcZ = 520;
+	float focus = 320;
+	float srcZ = 320;
 	float pupil = 6;
 	cv::Mat src = cv::imread("F:/ImagesForTest/lena.jpg");
 	cv::Mat screen = cv::Mat::zeros(1000, 1000, CV_32FC3);
@@ -17,8 +17,8 @@ int main()
 	HumanEye camera;
 	camera.SetFocalLength(focus);
 	camera.SetPupilSize(pupil);
-	
-	cv::resize(src, src, cv::Size(), density, density);
+
+	cv::resize(src, src, cv::Size(), density, density,cv::INTER_NEAREST);
 	float xs = -float(src.cols) / density;
 	float ys = -float(src.rows) / density;
 	float xe = float(src.cols) / density;
@@ -35,7 +35,7 @@ int main()
 	cx += screen.cols / 2.0;
 	cy = screen.rows / 2.0 - cy;
 	rad *= screen.cols / 2.0 / 24.0;
-	
+
 	int row = 0;
 	for (float srcY = ys; srcY < ye; srcY += stepy)
 	{
@@ -52,11 +52,32 @@ int main()
 				color = src.at<cv::Vec3b>(row, col);
 			}
 			cv::Vec3f colorf((float)color[0] / 255.0, (float)color[1] / 255.0, (float)color[2] / 255.0);
-			camera.GenerateRay(focus, srcX, srcY, srcZ, pupil, screen, screenHitCount, colorf);
+
+			std::vector<Point> hitPoints;
+			camera.GenerateRay(focus, srcX, srcY, srcZ, pupil, hitPoints, 1.0);
+			float np = hitPoints.size();
+			float dx = (float)screen.cols / 2.0;
+			float dy = (float)screen.rows / 2.0;
+			float scale = (float)screen.cols / 24;
+
+			for (auto& p : hitPoints)
+			{
+				// учет наклона стенки сетчатки
+				float ang = 90.0* sqrt(p.x*p.x+p.y*p.y)/12.0;
+				p.x = round(p.x * scale + dx);
+				p.y = round(p.y * scale + dy);
+				if (p.x >= 0 && p.x < screen.cols && p.y >= 0 && p.y < screen.rows)
+				{					
+					screen.at<cv::Vec3f>(p.y, p.x) += colorf;// * cos(ang*M_PI/180.0);
+					screenHitCount.at<float>(p.y, p.x) += 1.0;
+				}
+			}
 			++col;
 		}
 		++row;
 	}
+	// не знаю почему 2.0, видимо линзы собирают местами больше
+	//cv::normalize(screen, screen,0,1.5, cv::NORM_MINMAX);
 	std::vector<cv::Mat> ch;
 	cv::split(screen, ch);
 	for (auto& c : ch)
@@ -65,15 +86,14 @@ int main()
 	}
 	cv::merge(ch, screen);
 
+
 	cv::circle(screen, cv::Point(cx, cy), rad, cv::Scalar(255, 255, 255), 2);
 	cv::imshow("screen", screen);
 	cv::imwrite("res2.png", screen * 255);
 	cv::waitKey();
 	return 1;
 }
-
-
-/*
+#else
 int main()
 {
 	float focus = 220;
@@ -84,7 +104,7 @@ int main()
 	HumanEye camera;
 	camera.SetFocalLength(focus);
 	camera.SetPupilSize(pupil);
-	
+
 	for (auto l : camera.lenses)
 	{
 		l.print();
@@ -95,39 +115,52 @@ int main()
 	float rad = 24;
 	cx += screen.cols / 2;
 	cy += screen.rows / 2;
-	rad *= screen.cols / 60.0;
-
-			cv::Vec3b color(255, 255, 255);
-			cv::Vec3f colorf((float)color[0] / 255.0, (float)color[1] / 255.0, (float)color[2] / 255.0);
-			float R = 700;
+	rad *= screen.cols / 24.0;
+	
+	float R = 200;
+	std::vector<Point> hitPoints;
+	for (float r = 0; r < R * R; r += R * R / 10)
+	{
+		for (float a = 0; a < 2 * M_PI; a += M_PI / 12)
+		{
+			float x = sqrt(r) * cos(a);
+			float y = sqrt(r) * sin(a);
 			
-			for (float r = 0; r < R; r += R/15)
+			camera.GenerateRay(focus, x, y, srcZ, pupil, hitPoints, 1.0);
+			if (hitPoints.size() == 0) continue;
+
+			float np = hitPoints.size();
+			float dx = (float)screen.cols / 2.0;
+			float dy = (float)screen.rows / 2.0;
+			float scale = (float)screen.cols / 24;
+			cv::Vec3f colorf(1, 1, 1);
+
+				colorf[0] /= np;
+				colorf[1] /= np;
+				colorf[2] /= np;
+			
+			for (auto& p : hitPoints)
 			{
-				for (float a = 0; a < 2 * M_PI; a += M_PI / 60)
+				p.x = round(p.x * scale + dx);
+				p.y = round(p.y * scale + dy);
+				if (p.x >= 0 && p.x < screen.cols && p.y >= 0 && p.y < screen.rows)
 				{
-					float x = r * cos(a);
-					float y = r * sin(a);
-					camera.GenerateRay(focus, x, y, srcZ, pupil, screen, screenHitCount, colorf);
+					//screen.at<cv::Vec3f>(p.y, p.x) = cv::Vec3f(1, 1, 1);
+					screen.at<cv::Vec3f>(p.y, p.x) += colorf*50;
+					screenHitCount.at<float>(p.y, p.x) + 1.0;
 				}
 			}
-			
-			float x = R * cos(0);
-			float y = R * sin(0);
-			camera.GenerateRay(focus, x, y, srcZ, pupil, screen, screenHitCount, colorf);
-	
-
-	std::vector<cv::Mat> ch;
-	cv::split(screen, ch);
-	for (auto& c : ch)
-	{
-		cv::divide(c, screenHitCount, c);
+		}
 	}
-	
-	cv::merge(ch, screen);
+
+	//float x = R * cos(0);
+	//float y = R * sin(0);
+	//camera.GenerateRay(focus, x, y, srcZ, pupil, screen, screenHitCount, colorf);
+
 	cv::circle(screen, cv::Point(cx, cy), rad, cv::Scalar(255, 255, 255), 2);
 	cv::imshow("screen", screen);
 	cv::imwrite("res1.png", screen * 255);
 	cv::waitKey();
 	return 1;
 }
-*/
+#endif

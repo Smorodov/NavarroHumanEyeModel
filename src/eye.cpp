@@ -17,7 +17,7 @@ HumanEye::HumanEye()
 	phi = 0;
 }
 
-bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end) const
+bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end,float kn) const
 {
 	Ray tempRay = inRay;
 	
@@ -32,7 +32,7 @@ bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end) co
 	int i = start;
 	for (; i != end; i += increment)
 	{
-		if (!lenses[i].RefractRay(tempRay, outRay))
+		if (!lenses[i].RefractRay(tempRay, outRay,kn))
 		{
 			break;
 		}
@@ -48,7 +48,7 @@ bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end) co
 	}
 }
 
-bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end, std::vector<Point>& points) const
+bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end, std::vector<Point>& points,float kn) const
 {
 	Ray tempRay = inRay;
 	points.clear();
@@ -62,7 +62,7 @@ bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end, st
 	int i = start;
 	for (; i != end; i += increment)
 	{
-		if (!lenses[i].RefractRay(tempRay, outRay))
+		if (!lenses[i].RefractRay(tempRay, outRay,kn))
 		{
 			points.push_back(outRay.o);
 			break;
@@ -182,19 +182,19 @@ HumanEye::~HumanEye()
 	lenses.clear();
 }
 
-float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil, cv::Mat& screen, cv::Mat& screenHitCount, cv::Vec3f c) const
+float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil, std::vector<Point>& hitPoints,float kn) const
 {
 	Point objectSample = Point(x, y, z);
 	std::vector<Point> points;
 	
 	// диаметр зрачка
 	float aperture = lenses.back().aperture / 2.0;
-	float nsteps = 10;// aperture* screen.cols / 2 / 30.0 / 10;
-	float r2 = aperture * aperture / 4.0;
-	float s = -aperture / 2.0;
-	float e = aperture / 2.0;
-	float st = 2.0*M_PI / nsteps;
-			
+	float nsteps = 25;// aperture* screen.cols / 2 / 30.0 / 10;
+	float r2 = aperture * aperture;
+	float s = -aperture;
+	float e = aperture;
+	float st = (e-s) / nsteps;
+	hitPoints.clear();
 	for (float i = s; i <= e; i += st)
 	{
 		for (float j = s; j <= e; j += st)
@@ -205,24 +205,11 @@ float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil,
 			}
 			Point lensSample = Point(i, j, discZ);
 			Ray filmLensRay(objectSample, Normalize(lensSample - objectSample), 0), primaryRay;
-			if (TraceLenses(filmLensRay, primaryRay, (int)lenses.size() - 1, -1, points))
-			{
-				//primaryRay.d = Normalize(primaryRay.o - Point(0, 0, lenses[0].zPos + 2 * lenses[0].radius));
-				//float t = (lenses[0].zPos - primaryRay.o.z) / primaryRay.d.z;
-				//Point hit = primaryRay(t);
+			if (TraceLenses(filmLensRay, primaryRay, (int)lenses.size() - 1, -1, points,kn))
+			{				
+				// можнт надо сдвинуть по z на позицию центра линзы (проверить!)
 				Point hit = primaryRay.o;
-
-				hit.x *= (float)screen.cols / 24.0; // assume diameter=30 mm
-				hit.y *= (float)screen.rows / 24.0; // assume diameter=30 mm
-				hit.x += (float)screen.cols / 2.0;
-				hit.y += (float)screen.rows / 2.0;
-				if (hit.x >= 0 && hit.x < screen.cols &&
-				        hit.y >= 0 && hit.y < screen.rows
-				   )
-				{
-					screen.at<cv::Vec3f>(round(hit.y), round(hit.x)) += c;
-					screenHitCount.at<float>(round(hit.y), round(hit.x) ) += 1.0;
-				}				
+				hitPoints.push_back(hit);			
 			}
 		}
 	}
@@ -255,8 +242,8 @@ bool HumanEye::SetFocalLength(float f)
 		inRay.o.z = f;
 		float passed = 0;
 		float focusSum = 0;
-		int iter = 50;
-		for (int i = 0; i < iter; ++i)
+		int iter2 = 50;
+		for (int i = 0; i < iter2; ++i)
 		{
 			// trace 50 rays through eye model
 			Point p = getRandomPointOnLens();
@@ -266,7 +253,7 @@ bool HumanEye::SetFocalLength(float f)
 			inRay.d = Normalize(p - inRay.o);
 			//inRay.o = Point(0,1,1);
 			//inRay.d = Vector(0,0,-1);
-			if (TraceLenses(inRay, outRay, lenses.size() - 1, 0))
+			if (TraceLenses(inRay, outRay, lenses.size() - 1, 0,1))
 			{
 				if (fabs(outRay.d.y) < 1e-6) continue;
 
@@ -274,8 +261,9 @@ bool HumanEye::SetFocalLength(float f)
 				if (t > 0)
 				{
 					focusSum += outRay(t).z;
+					passed++;
 				}
-				passed++;
+				
 			}
 		}
 		float focus = focusSum / passed;
@@ -285,7 +273,7 @@ bool HumanEye::SetFocalLength(float f)
 			printf("%f %f\n", focus, current);
 			return true;
 		}
-		if (focus > lenses[0].zPos)
+		if (focus > lenses.front().zPos)
 		{
 			end = current;
 		}
@@ -318,7 +306,7 @@ Vector Lens::GetNormal(const Ray* ray, const Point& p) const
 	return result;
 }
 
-bool Lens::RefractRay(const Ray& inRay, Ray& outRay) const
+bool Lens::RefractRay(const Ray& inRay, Ray& outRay,float kn) const
 {
 	// точка попадантя луча в линзу
 	Point phit;
@@ -428,7 +416,7 @@ bool Lens::RefractRay(const Ray& inRay, Ray& outRay) const
 	//Vector n  = Normalize(phit - center);
 	Vector n = GetNormal(&inRay, phit);
 	Vector in = Normalize(tDir);
-	float mu = refractionRatio;
+	float mu = refractionRatio*kn;
 	if (tDir.z < 0)
 	{
 		mu = 1.0 / mu;
