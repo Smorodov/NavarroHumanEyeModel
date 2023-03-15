@@ -58,7 +58,7 @@ int main()
 				}
 				cv::Vec3f colorf((float)color[0] / 255.0, (float)color[1] / 255.0, (float)color[2] / 255.0);
 
-				std::vector<Point> hitPoints;
+				std::vector<gdt::vec3f> hitPoints;
 				camera.GenerateRay(focus, srcX, srcY, srcZ, pupil, hitPoints, kns[channel]);
 				float np = hitPoints.size();
 				float dx = (float)screen.cols / 2.0;
@@ -128,7 +128,7 @@ int main()
 	rad *= screen.cols / 24.0;
 	
 	float R = 200;
-	std::vector<Point> hitPoints;
+	std::vector<gdt::vec3f> hitPoints;
 	
 	float kns[3] = { 0.997,1,1.003 };
 

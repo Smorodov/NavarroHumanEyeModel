@@ -12,6 +12,12 @@ project(Human-Eye-Model-Ray-Tracing)
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
     endif()
 
+include_directories(gdt)
+include_directories(gdt/gdt)
+include_directories(gdt/gdt/math)
+include_directories(gdt/gdt/random)
+add_subdirectory(gdt)
+
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
@@ -22,7 +28,6 @@ src/main.cpp
 
 set(HEADERS
 src/eye.h
-src/geometry.h
 )
 add_definitions(-D_USE_MATH_DEFINES -DNOMINMAX)
 SOURCE_GROUP("Source Files" FILES ${SOURCES})
@@ -31,7 +36,7 @@ SOURCE_GROUP("Header Files" FILES ${HEADERS})
 #
 # -----------------------------
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} gdt)
 # -----------------------------
 set_target_properties( ${PROJECT_NAME} PROPERTIES  VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>")
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})

@@ -13,7 +13,7 @@ HumanEye::HumanEye()
 	ParseSpecfile("data/Navarro.dat");
 	float dz = -2.674404474;
 	discZ = lenses[lenses.size() - 1].zPos + dz;
-	testPoint = Point(0, 100, 200);
+	testPoint = gdt::vec3f(0, 100, 200);
 	phi = 0;
 }
 
@@ -24,7 +24,7 @@ bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end,flo
 	if (inRay.o.z > 10)
 	{
 		// move start point close enough
-		float t = (Point(0, 0, 10) - inRay.o).z / inRay.d.z;
+		float t = (gdt::vec3f(0, 0, 10) - inRay.o).z / inRay.d.z;
 		tempRay.o = inRay(t);
 	}
 	
@@ -48,14 +48,14 @@ bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end,flo
 	}
 }
 
-bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end, std::vector<Point>& points,float kn) const
+bool HumanEye::TraceLenses(const Ray& inRay, Ray& outRay, int start, int end, std::vector<gdt::vec3f>& points,float kn) const
 {
 	Ray tempRay = inRay;
 	points.clear();
 	points.push_back(inRay.o);
 	if (inRay.o.z > 10)
 	{
-		float t = (Point(0, 0, 10) - inRay.o).z / inRay.d.z;
+		float t = (gdt::vec3f(0, 0, 10) - inRay.o).z / inRay.d.z;
 		tempRay.o = inRay(t);
 	}
 	int increment = (end >= start) ? 1 : -1;
@@ -137,9 +137,9 @@ void ConcentricSampleDisk(float u1, float u2, float* dx, float* dy)
 	*dy = r * sinf(theta);
 }
 
-Point HumanEye::getRandomPointOnLens() const
+gdt::vec3f HumanEye::getRandomPointOnLens() const
 {
-	Point p;
+	gdt::vec3f p;
 	float ux, uy, dx, dy;
 	ux = ((float)rand() / (RAND_MAX));
 	uy = ((float)rand() / (RAND_MAX));
@@ -182,10 +182,10 @@ HumanEye::~HumanEye()
 	lenses.clear();
 }
 
-float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil, std::vector<Point>& hitPoints,float kn) const
+float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil, std::vector<gdt::vec3f>& hitPoints,float kn) const
 {
-	Point objectSample = Point(x, y, z);
-	std::vector<Point> points;
+	gdt::vec3f objectSample = gdt::vec3f(x, y, z);
+	std::vector<gdt::vec3f> points;
 	
 	// диаметр зрачка
 	float aperture = lenses.back().aperture / 2.0;
@@ -203,12 +203,12 @@ float HumanEye::GenerateRay(float focus, float x, float y, float z, float pupil,
 			{
 				continue;
 			}
-			Point lensSample = Point(i, j, discZ);
-			Ray filmLensRay(objectSample, Normalize(lensSample - objectSample), 0), primaryRay;
+			gdt::vec3f lensSample = gdt::vec3f(i, j, discZ);
+			Ray filmLensRay(objectSample,gdt::vec3f(gdt::normalize(lensSample - objectSample)), 0), primaryRay;
 			if (TraceLenses(filmLensRay, primaryRay, (int)lenses.size() - 1, -1, points,kn))
 			{				
 				// можнт надо сдвинуть по z на позицию центра линзы (проверить!)
-				Point hit = primaryRay.o;
+				gdt::vec3f hit = primaryRay.o;
 				hitPoints.push_back(hit);			
 			}
 		}
@@ -235,7 +235,7 @@ bool HumanEye::SetFocalLength(float f)
 	Ray inRay, outRay;
 	float start = 0, end = 13, current = start;
 	int iter = 500;
-	inRay.o = Point(0, 0, 0);
+	inRay.o = gdt::vec3f(0, 0, 0);
 	while (iter--)
 	{
 		SetDP(current);
@@ -246,13 +246,13 @@ bool HumanEye::SetFocalLength(float f)
 		for (int i = 0; i < iter2; ++i)
 		{
 			// trace 50 rays through eye model
-			Point p = getRandomPointOnLens();
+			gdt::vec3f p = getRandomPointOnLens();
 			p.x = 0;
 			//p.y = 0.4;
 			//p.z = 0;
-			inRay.d = Normalize(p - inRay.o);
-			//inRay.o = Point(0,1,1);
-			//inRay.d = Vector(0,0,-1);
+			inRay.d = gdt::normalize(p - inRay.o);
+			//inRay.o = gdt::vec3f(0,1,1);
+			//inRay.d = gdt::vec3f(0,0,-1);
 			if (TraceLenses(inRay, outRay, lenses.size() - 1, 0,1))
 			{
 				if (fabs(outRay.d.y) < 1e-6) continue;
@@ -293,15 +293,15 @@ Lens::Lens(float rad, float asph, float zpos, float refr, float aper)
 {
 }
 
-Vector Lens::GetNormal(const Ray* ray, const Point& p) const
+gdt::vec3f Lens::GetNormal(const Ray* ray, const gdt::vec3f& p) const
 {
-	Vector o = p - Point(0, 0, zPos);
-	Vector result = Normalize(Vector(o.x,
+	gdt::vec3f o = p - gdt::vec3f(0, 0, zPos);
+	gdt::vec3f result = gdt::normalize(gdt::vec3f(o.x,
 	                                 o.y,
 	                                 (1 + asphericity) * o.z - radius));
 	if (result.z < 0)
 	{
-		result = -1 * result;
+		result = -result;
 	}
 	return result;
 }
@@ -309,7 +309,7 @@ Vector Lens::GetNormal(const Ray* ray, const Point& p) const
 bool Lens::RefractRay(const Ray& inRay, Ray& outRay,float kn) const
 {
 	// точка попадантя луча в линзу
-	Point phit;
+	gdt::vec3f phit;
 	// -----------
 	// Это апертура
 	// ------------
@@ -339,8 +339,8 @@ bool Lens::RefractRay(const Ray& inRay, Ray& outRay,float kn) const
 	// Это линза
 	// // -------
 	// Пересчитаем координаты начала луча относительно центра линзы
-	Vector tOrigin = inRay.o - Point(0, 0, zPos);
-	Vector tDir = inRay.d;//Normalize(inRay.d - Vector(0,0,zPos));
+	gdt::vec3f tOrigin = inRay.o - gdt::vec3f(0, 0, zPos);
+	gdt::vec3f tDir = inRay.d;//Normalize(inRay.d - gdt::vec3f(0,0,zPos));
 	// Compute quadratic sphere coefficients
 	//float A = inRay.d.x * inRay.d.x + inRay.d.y * inRay.d.y + inRay.d.z * inRay.d.z;
 	//float A = 1;
@@ -406,22 +406,22 @@ bool Lens::RefractRay(const Ray& inRay, Ray& outRay,float kn) const
 		
 		return true;
 	}
-	if (phit.HasNaNs() || !OnLens(phit))
+	if (HasNaNs(phit) || !OnLens(phit))
 	{
 		return false;
 	}
 	// -----------------
 	// нормальная линза
 	// // -----------------
-	//Vector n  = Normalize(phit - center);
-	Vector n = GetNormal(&inRay, phit);
-	Vector in = Normalize(tDir);
+	//gdt::vec3f n  = Normalize(phit - center);
+	gdt::vec3f n = GetNormal(&inRay, phit);
+	gdt::vec3f in = gdt::normalize(tDir);
 	float mu = refractionRatio*kn;
 	if (tDir.z < 0)
 	{
 		mu = 1.0 / mu;
 	}
-	float cosI = -Dot(n, in);
+	float cosI = -gdt::dot(n, in);
 	float sinT2 = mu * mu * (1 - cosI * cosI);
 	if (sinT2 > 1.0)
 	{
@@ -433,9 +433,9 @@ bool Lens::RefractRay(const Ray& inRay, Ray& outRay,float kn) const
 	return true;
 }
 
-bool Lens::OnLens(Point p) const
+bool Lens::OnLens(gdt::vec3f p) const
 {
-	Vector pp = p - Point(0, 0, zPos);
+	gdt::vec3f pp = p - gdt::vec3f(0, 0, zPos);
 	if (pp.x * pp.x + pp.y * pp.y > aperture * aperture * 0.25)
 	{
 		return false;
